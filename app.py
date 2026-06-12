@@ -7,7 +7,7 @@ st.set_page_config(page_title="AI Voice Summarizer", page_icon="🎤", layout="c
 st.title("🎤 AI Voice Summarizer")
 st.caption("Speak or upload audio in Tamil to get an instant English translation and summary.")
 
-# 🔑 FETCH SECRET KEY USING THE FRESH VARIABLE NAME
+# 🔑 FETCH SECRET KEY
 GEMINI_KEY = st.secrets.get("GEMINI_KEY", "")
 
 if not GEMINI_KEY:
@@ -36,19 +36,22 @@ if audio_file is not None:
             # Use the fast, native multimodal Gemini 2.5 Flash model
             model = genai.GenerativeModel("gemini-2.5-flash")
             
-            # Explicit, structured prompt layout to extract all three features safely
+            # Bulletproof prompt explicitly telling Gemini exactly how to structure the text chunks
             prompt = """
-            You are an expert AI Voice Engineer. Analyze the attached audio file data which contains Tamil speech.
-            Provide the output strictly using the structural headers below:
-            
-            ---TAMIL_TRANSCRIPT---
-            [Provide the exact text transcription of the Tamil speech spoken in the audio here]
-            
-            ---ENGLISH_TRANSLATION---
-            [Translate that Tamil transcription accurately into natural English text here]
-            
-            ---SUMMARY---
-            [Provide a brief, concise 1-2 sentence summary of the translation here]
+            Analyze the attached audio file which contains Tamil speech. 
+            You must provide three distinct outputs. Separate them exactly using these exact tags:
+
+            [TAMIL_START]
+            Write the exact text transcription of the Tamil speech spoken in the audio here.
+            [TAMIL_END]
+
+            [ENGLISH_START]
+            Translate that Tamil transcription completely and accurately into natural English here.
+            [ENGLISH_END]
+
+            [SUMMARY_START]
+            Provide a brief, concise 2-sentence summary of the English translation here.
+            [SUMMARY_END]
             """
             
             # Pass data directly as an inline media dictionary block
@@ -62,12 +65,11 @@ if audio_file is not None:
             
             response_text = response.text
             
-            # Parse response data structures to match your original front-end design
-            if "---TAMIL_TRANSCRIPT---" in response_text:
-                parts = response_text.split("---")
-                tamil_text = parts[1].replace("TAMIL_TRANSCRIPT---\n", "").strip()
-                english_text = parts[2].replace("ENGLISH_TRANSLATION---\n", "").strip()
-                summary_text = parts[3].replace("SUMMARY---\n", "").strip()
+            # 🔍 SAFELY EXTRACT TEXT SECTIONS USING TAG LOCATIONS
+            try:
+                tamil_text = response_text.split("[TAMIL_START]")[1].split("[TAMIL_END]")[0].strip()
+                english_text = response_text.split("[ENGLISH_START]")[1].split("[ENGLISH_END]")[0].strip()
+                summary_text = response_text.split("[SUMMARY_START]")[1].split("[SUMMARY_END]")[0].strip()
                 
                 st.success("🎉 Processing Completed Successfully!")
                 
@@ -79,9 +81,11 @@ if audio_file is not None:
                     
                 st.subheader("📝 Summary")
                 st.warning(summary_text)
-            else:
-                # Direct structural output fallback
-                st.subheader("🤖 Gemini Analysis")
+                
+            except Exception as parse_error:
+                # Fallback display layout if tags don't match exactly
+                st.success("🎉 Analysis Received!")
+                st.subheader("🤖 Generated Content Pipeline")
                 st.write(response_text)
                     
         except Exception as e:
