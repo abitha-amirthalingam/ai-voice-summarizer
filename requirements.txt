@@ -1,4 +1,2 @@
 streamlit
-openai-whisper
-deep-translator
-torch
+google-generativeai
